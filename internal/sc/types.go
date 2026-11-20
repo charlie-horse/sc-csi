@@ -81,6 +81,7 @@ type Replay struct {
 	Active              bool   `json:"active"`
 	MarkedForExpiration bool   `json:"markedForExpiration"`
 	CreateVolume        *Ref   `json:"createVolume"`
+	Source              string `json:"source"` // "Schedule" for replays taken by a snapshot profile
 }
 
 type ControllerPort struct {

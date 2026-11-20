@@ -163,6 +163,21 @@ func (a *Array) Replays(volID string) []string {
 	return out
 }
 
+// AddScheduledReplay adds a replay as a snapshot profile's schedule takes it: frozen, described by the
+// rule name cut to 31 characters, with an expiry, and source "Schedule".
+func (a *Array) AddScheduledReplay(volID, rule string) string {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if len(rule) > 31 {
+		rule = rule[:31]
+	}
+	rid := fmt.Sprintf("%s.%d", volID, len(a.replays)+1)
+	a.replays[rid] = obj{"instanceId": rid, "description": rule, "active": false, "freezeTime": "2026-11-19T20:00:05+02:00",
+		"expireTime": "2026-11-20T21:00:05+02:00", "size": "6815744 Bytes",
+		"createVolume": ref(volID, a.volumes[volID]["name"].(string)), "volume": volID, "source": "Schedule"}
+	return rid
+}
+
 // Servers returns the server objects by name.
 func (a *Array) Servers() map[string]obj {
 	a.mu.Lock()
@@ -325,7 +340,7 @@ func (a *Array) route(method, path string, body obj, apiVersion string) (int, an
 		}
 		rid := fmt.Sprintf("%s.%d", id, len(a.replays)+1)
 		a.replays[rid] = obj{"instanceId": rid, "description": desc, "active": false, "freezeTime": "2026-10-17T21:56:13+03:00",
-			"size": "6815744 Bytes", "createVolume": ref(id, v["name"].(string)), "volume": id}
+			"size": "6815744 Bytes", "createVolume": ref(id, v["name"].(string)), "volume": id, "source": "Manual"}
 		return 200, []obj{a.replays[rid]}
 	case "ScVolume/ReplayList":
 		v := a.volumes[id]

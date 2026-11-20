@@ -245,6 +245,40 @@ func TestSnapshotsAndClones(t *testing.T) {
 	}
 }
 
+// A snapshot profile on the volume (StorageClass snapshotProfile, or array-default) makes the array take
+// replays on its own. They must not look like CSI snapshots, or the HPE driver never deletes the volume.
+func TestScheduledReplaysAreNotSnapshots(t *testing.T) {
+	a, c, s, ctx := setup(t)
+	v, _ := s.CreateVolume(ctx, c, CreateVolumeRequest{Name: "pvc-sched", Size: 1 << 30, Config: map[string]any{"snapshotProfile": "Daily"}})
+	a.SetActive(v.ID)
+	sched := a.AddScheduledReplay(v.ID, "Daily_Best_Practices_System_Default")
+	if list, err := s.ListSnapshots(ctx, c, v.ID, ""); err != nil || len(list) != 0 {
+		t.Fatalf("a scheduled replay must not be listed as a snapshot: %v %v", list, err)
+	}
+	if _, err := s.GetSnapshot(ctx, c, sched); status(err) != http.StatusNotFound {
+		t.Errorf("a scheduled replay must not be readable as a snapshot, got %v", err)
+	}
+	if err := s.DeleteSnapshot(ctx, c, sched); status(err) != http.StatusNotFound {
+		t.Errorf("a scheduled replay must not be expired through the snapshot API, got %v", err)
+	}
+	snap, err := s.CreateSnapshot(ctx, c, SnapshotRequest{Name: "snapshot-user", VolumeID: v.ID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if list, _ := s.ListSnapshots(ctx, c, v.ID, ""); len(list) != 1 || list[0].ID != snap.ID {
+		t.Errorf("only the CSI snapshot is listed next to a scheduled replay: %v", list)
+	}
+	if err := s.DeleteSnapshot(ctx, c, snap.ID); err != nil {
+		t.Fatal(err)
+	}
+	if got := a.Replays(v.ID); len(got) != 1 || got[0] != sched {
+		t.Errorf("the scheduled replay must be left to the array: %v", got)
+	}
+	if err := s.DeleteVolume(ctx, c, v.ID); err != nil {
+		t.Errorf("a volume with only scheduled replays must be deletable: %v", err)
+	}
+}
+
 func TestLegacyNodeTagStillRecognised(t *testing.T) {
 	if got := NodeUUIDFromNotes("kube-dc-csp managed kube-dc-node-uuid=abc-1"); got != "abc-1" {
 		t.Errorf("legacy tag: got %q", got)

@@ -52,6 +52,8 @@ storageClasses:
     volumeBindingMode: WaitForFirstConsumer
     allowVolumeExpansion: true
     fsType: xfs
+    labels: {}                 # extra StorageClass labels, e.g. a platform's tier label
+    annotations: {}            # extra StorageClass annotations, e.g. declared capabilities
     parameters: {}             # storageProfile, dataReductionProfile, snapshotProfile, description
     allowedTopologies: []      # e.g. [{matchLabelExpressions: [{key: csi.hpe.com/zone, values: [sc]}]}]
 

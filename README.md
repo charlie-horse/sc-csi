@@ -42,7 +42,7 @@ Other SC Series models and SCOS 7.x releases use the same REST API and should wo
 Prerequisites: FC zoning between the nodes and the array, nodes prepared as in [docs/node-requirements.md](docs/node-requirements.md), and an array account as in [docs/array-setup.md](docs/array-setup.md).
 
 ```bash
-helm upgrade --install scseries-csp oci://ghcr.io/kube-dc/charts/scseries-csp --version 0.3.0 \
+helm upgrade --install scseries-csp oci://ghcr.io/kube-dc/charts/scseries-csp --version 0.3.1 \
   -n hpe-storage --create-namespace \
   --set array.host=sc.example.com \
   --set array.credentials.username=scseries-csp \
@@ -87,7 +87,7 @@ The chart sets `accessProtocol: fc`, the CSI secret references and the filesyste
 
 ```bash
 go test -race ./...                      # unit tests against an in-memory fake Storage Center
-hack/build-image.sh 0.3.0                # image without a container engine (go + crane)
+hack/build-image.sh 0.3.1                # image without a container engine (go + crane)
 hack/csi-e2e.sh all                      # end-to-end on a cluster with the chart installed
 ```
 

@@ -316,6 +316,9 @@ func (s *Service) DeleteVolume(ctx context.Context, c *sc.Client, id string) err
 
 // ---------------------------------------------------------------------------------------------- snapshots
 
+// replaySourceSchedule is ScReplay.source for replays created by a snapshot (replay) profile.
+const replaySourceSchedule = "Schedule"
+
 func isHelper(desc string) bool { return strings.HasPrefix(desc, helperPrefix) }
 
 func descMatches(desc, name string) bool {
@@ -340,7 +343,10 @@ func toSnapshot(r *sc.Replay, v *sc.Volume, name string) Snapshot {
 }
 
 // userReplays lists frozen replays created on this volume with a description. It skips the active replay,
-// replays a view volume inherits from its parent and, unless helpers is set, the driver's clone helpers.
+// replays a view volume inherits from its parent, replays taken by the array's snapshot schedule and,
+// unless helpers is set, the driver's clone helpers. Scheduled replays are not CSI snapshots: the HPE
+// driver refuses to delete a volume while GET /snapshots?volume_id= lists anything for it, so reporting
+// them would make every volume with a snapshot profile undeletable after the first scheduled replay.
 func (s *Service) userReplays(ctx context.Context, c *sc.Client, v *sc.Volume, helpers bool) ([]sc.Replay, error) {
 	var all []sc.Replay
 	if err := c.Get(ctx, "StorageCenter/ScVolume/"+v.InstanceID+"/ReplayList", &all); err != nil {
@@ -348,7 +354,7 @@ func (s *Service) userReplays(ctx context.Context, c *sc.Client, v *sc.Volume, h
 	}
 	out := []sc.Replay{}
 	for _, r := range all {
-		if r.Active || r.MarkedForExpiration || r.Description == "" {
+		if r.Active || r.MarkedForExpiration || r.Description == "" || r.Source == replaySourceSchedule {
 			continue
 		}
 		if owner := r.CreateVolume.ID(); owner != "" && owner != v.InstanceID {
@@ -364,7 +370,7 @@ func (s *Service) userReplays(ctx context.Context, c *sc.Client, v *sc.Volume, h
 
 func (s *Service) getSnapshot(ctx context.Context, c *sc.Client, id string) (*sc.Replay, *sc.Volume, error) {
 	var r sc.Replay
-	if err := c.Get(ctx, "StorageCenter/ScReplay/"+id, &r); err != nil || r.InstanceID == "" || r.MarkedForExpiration {
+	if err := c.Get(ctx, "StorageCenter/ScReplay/"+id, &r); err != nil || r.InstanceID == "" || r.MarkedForExpiration || r.Source == replaySourceSchedule {
 		if err != nil && !sc.IsStatus(err, 400) && !sc.IsStatus(err, 404) {
 			return nil, nil, err
 		}

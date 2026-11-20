@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.1
+
+- Fix: replays taken by the array's snapshot schedule are no longer reported as CSI snapshots. The HPE driver refuses to delete a volume that lists any snapshot, so a volume with a snapshot profile (StorageClass `snapshotProfile`, or `array-default`) could not be deleted once the first scheduled replay existed.
+- `storageClasses[].labels` and `storageClasses[].annotations`: extra metadata on each StorageClass. Platforms that classify classes by metadata need it; kube-dc otherwise treats a `csi.hpe.com` class as RWO filesystem only.
+- `values-kube-dc.yaml` declares the kube-dc storage-class contract for `scseries-block` (tier, kind, capabilities incl. `rwx-block` and `live-migration`, snapshot class).
+
 ## 0.3.0
 
 - Helm chart `charts/scseries-csp`: optional pinned HPE CSI Driver 3.3.0 dependency, StorageClass and VolumeSnapshotClass, PodDisruptionBudget, NetworkPolicy, ServiceMonitor, PrometheusRule, audit CronJob, CDI StorageProfile integration.

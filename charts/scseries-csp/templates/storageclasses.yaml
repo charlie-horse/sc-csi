@@ -6,9 +6,17 @@ kind: StorageClass
 metadata:
   name: {{ .name }}
   labels: {{- include "scseries-csp.labels" $ | nindent 4 }}
-  {{- if .isDefault }}
+    {{- range $k, $v := .labels }}
+    {{ $k }}: {{ $v | quote }}
+    {{- end }}
+  {{- if or .isDefault .annotations }}
   annotations:
+    {{- if .isDefault }}
     storageclass.kubernetes.io/is-default-class: "true"
+    {{- end }}
+    {{- range $k, $v := .annotations }}
+    {{ $k }}: {{ $v | quote }}
+    {{- end }}
   {{- end }}
 provisioner: csi.hpe.com
 parameters:

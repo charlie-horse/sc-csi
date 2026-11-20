@@ -12,6 +12,15 @@ storageClasses:
     volumeBindingMode: WaitForFirstConsumer
     allowVolumeExpansion: true
     fsType: xfs
+    # kube-dc storage-class contract: without the tier label a csi.hpe.com class is offered as
+    # RWO filesystem only, so VMs on it could not live-migrate.
+    labels:
+      storage.kube-dc.com/tier: balanced
+      storage.kube-dc.com/kind: block
+    annotations:
+      storage.kube-dc.com/display-name: "SC Series (Fibre Channel)"
+      storage.kube-dc.com/capabilities: "snapshot,clone,expand,block-mode,rwx-block,live-migration"
+      storage.kube-dc.com/snapshot-class: scseries-snap
     parameters:
       description: "kube-dc PVC {pvc} in {namespace}"
     allowedTopologies:

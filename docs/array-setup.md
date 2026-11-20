@@ -30,6 +30,7 @@ With a DSM Data Collector in front of the array, a Volume Manager account limite
 
 - The CSP creates its volume folder and server folder on first use (default `scseries-csp`).
 - New volumes inherit the array's default snapshot profile (often "Daily") and data reduction. The CSP removes the snapshot schedule unless `snapshotProfile` is set, and applies the storage and data-reduction profiles from the StorageClass. Check the array defaults: `hack/sc-probe.py info`.
+- **Tiered profiles need a snapshot schedule.** With a storage profile that writes to a fast tier and keeps snapshot pages on a slower one, pages only move down once a replay has frozen them. Give such a StorageClass a `snapshotProfile` with a short expiry (Dell's `Daily_Best_Practices_System_Default`: daily, kept 25 hours); without one, everything ever written stays on the fast tier. Scheduled replays are the array's business: the CSP does not report them as CSI snapshots and never expires them.
 - Server objects get OS type `Red Hat Linux 7.x` (configurable).
 
 ## Fibre Channel

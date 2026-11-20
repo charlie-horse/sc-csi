@@ -1,4 +1,5 @@
 # RWX raw block shared by pods on two different nodes (NODE_A, NODE_B substituted by the caller).
+# Read and write with dd iflag=direct / oflag=direct: each node has its own page cache for the device.
 apiVersion: v1
 kind: Namespace
 metadata:
@@ -20,7 +21,7 @@ spec:
   nodeSelector: {kubernetes.io/hostname: NODE_A}
   containers:
     - name: c
-      image: docker.io/library/busybox:1.37.0
+      image: docker.io/library/debian:stable-slim   # GNU dd for real direct I/O
       command: ["sleep", "1d"]
       volumeDevices: [{name: v, devicePath: /dev/xvda}]
   volumes:
@@ -34,7 +35,7 @@ spec:
   nodeSelector: {kubernetes.io/hostname: NODE_B}
   containers:
     - name: c
-      image: docker.io/library/busybox:1.37.0
+      image: docker.io/library/debian:stable-slim   # GNU dd for real direct I/O
       command: ["sleep", "1d"]
       volumeDevices: [{name: v, devicePath: /dev/xvda}]
   volumes:

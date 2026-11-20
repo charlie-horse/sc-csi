@@ -30,4 +30,6 @@ The fake array reproduces behaviours observed on a real SC5020 (SCOS 7.2.30):
 | All-path loss | I/O held for ~120 s (`no_path_retry 24`), then failed fast; recovered right after the paths returned |
 | Leader failover | leader killed during provisioning of 6 PVCs: new leader, 6/6 pods running, exactly 6 volumes, clean teardown |
 
+Repeated on a 12-node cluster (HPE CSI 3.3.0, Kubernetes 1.35 RKE2, Kube-OVN, release 0.3.1), with ten nodes attached, four of them through adopted legacy server objects (VMware ESXi OS type): CSI e2e on two classes, an attach on every node, live migrations of a VM (about 2 s each; the guest re-read its disk after dropping its caches following each of six moves, with no mismatch and no I/O error), path loss, restarts and all-path loss with the same results, leader failover, and the deletion of a volume that carried a replay taken by the array's snapshot schedule. Ceph OSDs on static volumes of the same array and of a second array on the same hosts were not disturbed by the node plugin's start, restart, attach or detach.
+
 Not yet validated: SC controller failover, real switch-port failures, multi-day soak, other SC models.

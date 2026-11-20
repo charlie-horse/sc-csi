@@ -33,7 +33,17 @@ KubeVirt virt-launcher and the CDI importer run as non-root. For raw block PVCs,
   device_ownership_from_security_context = true
 ```
 
-Without it, importer and VM pods fail with "Permission denied" on `/dev/...`.
+Without it, importer and VM pods fail with "Permission denied" on `/dev/...` (the CDI importer: `qemu-img: ... Could not open '/dev/cdi-block-volume': Permission denied`).
+
+- The HPE node plugin publishes a raw block volume as its own device node, owned by `root:root` with mode `0640`. Adding the `disk` group to the pod (what some platforms do for Ceph RBD devices, which are `root:disk 0660`) therefore does not help; the runtime has to hand the device to the pod's user.
+- RKE2 1.32 and later read drop-ins, so the template need not be copied:
+  ```toml
+  # /var/lib/rancher/rke2/agent/etc/containerd/config-v3.toml.d/10-device-ownership.toml
+  [plugins."io.containerd.cri.v1.runtime"]
+    device_ownership_from_security_context = true
+  ```
+  Restart `rke2-agent` (workers) or `rke2-server` (servers) one node at a time; running containers keep running. Verify with `containerd config dump | grep device_ownership`: the rendered `config.toml` itself still shows `false`, the drop-in overrides it.
+- It applies to containers created after the restart, on every node a VM may run on or migrate to.
 
 ## Kernel limits
 

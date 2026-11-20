@@ -38,8 +38,10 @@ basic() {
   render $T/pvc-tests.yaml | kubectl apply -f - >/dev/null
   wait_pods sc-csi-test
   check "Bound Bound" "$(kubectl -n sc-csi-test get pvc fs-rwo block-rwx -o jsonpath='{.items[*].status.phase}')" "PVCs bound"
-  kubectl -n sc-csi-test exec block-b -- sh -c 'echo reply-from-block-b | dd of=/dev/xvda bs=512 seek=8 count=1 conv=sync,fsync 2>/dev/null'
-  check "hello-from-block-a" "$(kubectl -n sc-csi-test exec block-b -- sh -c 'dd if=/dev/xvda bs=512 count=1 2>/dev/null | head -c 18')" "RWX block: b reads a"
+  echo "      block-a on $(kubectl -n sc-csi-test get pod block-a -o jsonpath='{.spec.nodeName}'), block-b on $(kubectl -n sc-csi-test get pod block-b -o jsonpath='{.spec.nodeName}')"
+  # direct I/O on both sides: the two pods may run on different nodes, each with its own page cache
+  kubectl -n sc-csi-test exec block-b -- sh -c 'echo reply-from-block-b | dd of=/dev/xvda bs=512 seek=8 count=1 conv=sync oflag=direct 2>/dev/null'
+  check "hello-from-block-a" "$(kubectl -n sc-csi-test exec block-b -- sh -c 'dd if=/dev/xvda bs=512 count=1 iflag=direct 2>/dev/null | head -c 18')" "RWX block: b reads a"
   check "reply-from-block-b" "$(kubectl -n sc-csi-test exec block-a -- sh -c 'dd if=/dev/xvda bs=512 skip=8 count=1 iflag=direct 2>/dev/null | head -c 18')" "RWX block: a reads b"
   kubectl -n sc-csi-test patch pvc fs-rwo -p '{"spec":{"resources":{"requests":{"storage":"3Gi"}}}}' >/dev/null
   for _ in $(seq 1 30); do

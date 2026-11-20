@@ -5,6 +5,8 @@
 - Fix: replays taken by the array's snapshot schedule are no longer reported as CSI snapshots. The HPE driver refuses to delete a volume that lists any snapshot, so a volume with a snapshot profile (StorageClass `snapshotProfile`, or `array-default`) could not be deleted once the first scheduled replay existed.
 - Fix: the `helm.sh/chart` label is valid when the chart version carries build metadata (`0.3.1+<commit>`, as Flux produces for a chart built from a Git repository); the install failed with "a valid label must ...".
 - `networkPolicy.hostNetworkCIDRs`: admits the host-network HPE controller where the CNI applies NetworkPolicies to node traffic (Kube-OVN). Without it the controller could not reach the CSP there and every PVC stayed Pending.
+- Tests: the RWX raw-block checks use GNU `dd` with direct I/O. The old check read through the page cache (busybox's `iflag=direct` included) and only passed while both pods shared a node.
+- Docs: containerd device ownership as an RKE2 drop-in, and why the `disk` group does not help; a node whose ports are split between an adopted and a CSP-created server object.
 - `storageClasses[].labels` and `storageClasses[].annotations`: extra metadata on each StorageClass. Platforms that classify classes by metadata need it; kube-dc otherwise treats a `csi.hpe.com` class as RWO filesystem only.
 - `values-kube-dc.yaml` declares the kube-dc storage-class contract for `scseries-block` (tier, kind, capabilities incl. `rwx-block` and `live-migration`, snapshot class).
 

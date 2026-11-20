@@ -64,4 +64,5 @@ What does work:
   ```
   When the node registers, the CSP reuses the object (matched by WWPN), adds the node's other HBAs and maps volumes as usual. The leftover protocol endpoint stays mapped; node multipath ignores it because the WWID exception excludes protocol endpoints.
   The object keeps the VMware ESXi OS type. Verify I/O and multipath on the first adopted node.
+  A node may already have a server object of its own in the CSP folder, created earlier from the one port that was free. After the adoption its two ports then belong to two objects in the folder, and attaching fails with "WWPNs of <node> belong to several SC servers". Delete the node's own object (it has no volumes): `python3 -I hack/sc-maint.py wipe-servers --match '^<node>$'` (dry run), then `--yes`. The CSP then adds the free port to the adopted object.
   Until each node registers, `scseries-csp audit` reports the adopted objects as `stale-server`; `--fix stale-server` cannot delete them, because they are still mapped.

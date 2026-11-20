@@ -41,8 +41,10 @@ metadata: {name: block-a, namespace: sc-csi-test}
 spec:
   containers:
     - name: c
-      image: docker.io/library/busybox:1.37.0
-      command: ["sh", "-c", "echo hello-from-block-a | dd of=/dev/xvda bs=512 count=1 conv=sync,fsync && sleep 1d"]
+      # GNU dd: the shared device is read and written with real direct I/O. A buffered read (and busybox's
+      # iflag=direct) is served from the node's page cache, which never sees another node's writes.
+      image: docker.io/library/debian:stable-slim
+      command: ["sh", "-c", "echo hello-from-block-a | dd of=/dev/xvda bs=512 count=1 conv=sync oflag=direct && sleep 1d"]
       volumeDevices: [{name: v, devicePath: /dev/xvda}]
   volumes:
     - name: v
@@ -54,8 +56,8 @@ metadata: {name: block-b, namespace: sc-csi-test}
 spec:
   containers:
     - name: c
-      image: docker.io/library/busybox:1.37.0
-      command: ["sh", "-c", "sleep 15; dd if=/dev/xvda bs=512 count=1 2>/dev/null | head -c 19; echo; sleep 1d"]
+      image: docker.io/library/debian:stable-slim
+      command: ["sh", "-c", "sleep 15; dd if=/dev/xvda bs=512 count=1 iflag=direct 2>/dev/null | head -c 19; echo; sleep 1d"]
       volumeDevices: [{name: v, devicePath: /dev/xvda}]
   volumes:
     - name: v

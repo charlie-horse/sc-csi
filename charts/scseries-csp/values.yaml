@@ -69,6 +69,11 @@ cdi:
 
 networkPolicy:
   enabled: true
+  # The HPE CSI controller is a host-network pod: the policy's pod selector does not match it.
+  # CNIs that apply NetworkPolicies to traffic from the nodes (Kube-OVN, for one) then drop its
+  # calls and provisioning fails with "dial tcp ...:8080: i/o timeout". List the addresses node
+  # traffic arrives from: the node network, or the CNI's node-side range (Kube-OVN: the join subnet).
+  hostNetworkCIDRs: []
 podDisruptionBudget:
   enabled: true
 

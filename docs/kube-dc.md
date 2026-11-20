@@ -7,6 +7,7 @@
 | `csp.volumeFolder` / `serverFolder` | `kube-dc` | one folder pair per platform on shared arrays |
 | StorageClass `scseries-block` | `allowedTopologies` on `csi.hpe.com/zone=sc` | only FC-labelled nodes attach SC volumes |
 | StorageClass labels and annotations | `storage.kube-dc.com/tier`, `kind`, `capabilities`, `snapshot-class`, `display-name` | kube-dc reads what a class can do from this metadata, not from its name; without the tier label a `csi.hpe.com` class is offered as RWO filesystem only, so the console would not offer live migration on it |
+| `networkPolicy.hostNetworkCIDRs` | the cluster's Kube-OVN join subnet (`kubectl get subnet join`), in the site file | the HPE controller is a host-network pod and Kube-OVN applies the CSP's NetworkPolicy to node traffic; without it provisioning times out |
 | `cdi.storageProfiles.enabled` | true | VM DataVolumes default to RWX raw block (live migration) |
 | `serviceMonitor`, `prometheusRule` | enabled | CSP and array health in platform monitoring |
 | `audit.enabled` | true | hourly consistency check |

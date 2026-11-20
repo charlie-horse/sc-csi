@@ -23,6 +23,8 @@ spec:
 {{- if .Values.networkPolicy.enabled }}
 ---
 # Only the HPE CSI controller (and CSP standbys forwarding to the leader) may call the CSP API.
+# The controller runs on the host network, so no pod selector matches its traffic: where the CNI
+# applies policies to traffic from the nodes, networkPolicy.hostNetworkCIDRs must name its source addresses.
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -38,6 +40,9 @@ spec:
             matchLabels: {app: hpe-csi-controller}
         - podSelector:
             matchLabels: {{- include "scseries-csp.selector" . | nindent 14 }}
+        {{- range .Values.networkPolicy.hostNetworkCIDRs }}
+        - ipBlock: {cidr: {{ . | quote }}}
+        {{- end }}
       ports:
         - {port: 8080, protocol: TCP}
     - ports:

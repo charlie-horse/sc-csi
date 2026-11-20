@@ -61,6 +61,7 @@ Limit repairs with `--fix-match <regex>` on the volume or server name.
 
 | Symptom | Cause |
 |---|---|
+| PVC Pending, controller log: `Post "http://<csp>:8080/containers/v1/tokens": ... i/o timeout` | the CNI applies the CSP's NetworkPolicy to the host-network HPE controller; set `networkPolicy.hostNetworkCIDRs` |
 | PVC Pending: "no topology key found for node" | node lacks the `csi.hpe.com/zone` label, or the node plugin has not restarted since it was added |
 | Pod: "device not found with serial …" | the node's multipath configuration does not claim the volume (WWID exception, `find_multipaths`), or no FC path to the array |
 | Importer or VM pod: "Permission denied" on `/dev/...` | containerd `device_ownership_from_security_context` is off |

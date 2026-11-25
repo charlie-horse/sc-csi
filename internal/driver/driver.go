@@ -10,6 +10,8 @@ import (
 	"log/slog"
 	"strings"
 
+	"github.com/container-storage-interface/spec/lib/go/csi"
+
 	"github.com/charlie-horse/sc-csi/internal/csp"
 	"github.com/charlie-horse/sc-csi/internal/sc"
 )
@@ -33,6 +35,10 @@ type Config struct {
 // Driver serves the CSI services. Controller fields are nil on a node-only
 // instance; node fields are nil on a controller-only instance.
 type Driver struct {
+	csi.UnimplementedIdentityServer
+	csi.UnimplementedControllerServer
+	csi.UnimplementedNodeServer
+
 	Cfg Config
 	Log *slog.Logger
 
@@ -48,7 +54,7 @@ type Driver struct {
 
 // FCVolume says where a LUN is on the fabric.
 type FCVolume struct {
-	Serial  string   // device ID (NAA WWN) the multipath device must carry
+	Serial  string // device ID (NAA WWN) the multipath device must carry
 	LUN     int
 	Targets []string // array port WWPNs
 }
@@ -82,7 +88,7 @@ type Mounter interface {
 
 // VolumeStats are filesystem usage numbers for NodeGetVolumeStats.
 type VolumeStats struct {
-	TotalBytes, UsedBytes, AvailBytes    int64
+	TotalBytes, UsedBytes, AvailBytes   int64
 	TotalInodes, UsedInodes, FreeInodes int64
 }
 

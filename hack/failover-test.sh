@@ -2,7 +2,7 @@
 # FC/CSI resilience tests under continuous direct I/O (deploy/tests/io-load.yaml), run ON the node hosting the pod.
 #   hack/failover-test.sh [path|restarts|allpaths|all]
 #   path      one path of the test LUN offline 60 s           -> expect 0 errors, no slow writes
-#   restarts  restart CSP, CSI controller, CSI node plugin     -> expect 0 errors
+#   restarts  restart the driver pods (RESTART_LABELS)          -> expect 0 errors
 #   allpaths  all paths offline 180 s                           -> expect ~120 s stall (no_path_retry 24), then
 #                                                                  fast errors, recovery right after paths return
 # Only SCSI paths whose WWID matches the test PVC's serial are touched.
@@ -10,7 +10,8 @@ set -uo pipefail
 cd "$(dirname "$0")/.."
 NS=sc-fail-test
 STORAGE_CLASS="${STORAGE_CLASS:-scseries-fc}"
-CSP_NS="${CSP_NS:-hpe-storage}"
+CSI_NS="${CSI_NS:-sc-csi}"
+RESTART_LABELS="${RESTART_LABELS:-app=sc-csi-controller app=sc-csi-node}"  # pod label selectors
 
 setup() {
   sed "s/STORAGE_CLASS/$STORAGE_CLASS/g" deploy/tests/io-load.yaml | kubectl apply -f - >/dev/null
@@ -40,10 +41,10 @@ t_path() {
 }
 
 t_restarts() {
-  for t in app.kubernetes.io/name=scseries-csp app=hpe-csi-controller app=hpe-csi-node; do
+  for t in $RESTART_LABELS; do
     echo "== restart $t"
-    kubectl -n "$CSP_NS" delete pod -l $t --wait=true >/dev/null
-    kubectl -n "$CSP_NS" wait --for=condition=Ready pod -l $t --timeout=240s >/dev/null
+    kubectl -n "$CSI_NS" delete pod -l $t --wait=true >/dev/null
+    kubectl -n "$CSI_NS" wait --for=condition=Ready pod -l $t --timeout=240s >/dev/null
     sleep 20
   done
   echo "   errors=$(errors_since 3m) slow_writes=$(slow_since 3m)  (expect 0/0)"

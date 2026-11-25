@@ -1,35 +1,52 @@
 # Testing
 
 | Level | Command | Needs |
-|---|---|---|
-| Unit | `go test -race ./...` | nothing (in-memory fake Storage Center, `internal/sc/scfake`) |
-| CSP contract | `scseries-csp serve` on loopback + `hack/csp-smoke.py token / host / create / publish / snapshot / clone / unpublish / delete` | an array (`.env`), optionally a FC host for I/O checks with `hack/sc-node.sh` |
-| CSI e2e | `STORAGE_CLASS=… SNAPSHOT_CLASS=… hack/csi-e2e.sh all` | a cluster with the chart; `ARRAY_CHECK=1` also verifies the array is clean |
-| Resilience | `hack/failover-test.sh all` (path loss, control-plane restarts, all-path loss under I/O) | run on the node hosting the test pod |
-| HA | `hack/leader-failover-test.sh 6` (kills the CSP leader during provisioning) | a cluster with the chart |
-| KubeVirt | `deploy/tests/kubevirt-vm.yaml` + `VirtualMachineInstanceMigration` | KubeVirt and CDI; two FC nodes for migration |
+| --- | --- | --- |
+| Unit | `nix flake check`, or `go test ./...` | Nothing. Pure tests with in-process fakes |
+| Fake array | `go test -tags fakearray ./...` | Nothing. Starts an in-memory Storage Center on a local HTTPS port |
+| csi-sanity | `go test -tags fakearray ./test/sanity/` | Nothing. Part of the line above |
+| End to end | `hack/csi-e2e.sh all` | A cluster with the driver deployed and a real array |
+| Path loss | `hack/failover-test.sh all`, run on the node that hosts the test pod | As above, plus root on that node |
 
-The fake array reproduces behaviours observed on a real SC5020 (SCOS 7.2.30):
-- API-version negotiation on login;
-- one-element lists from `CreateReplay` and `CreateView`;
-- 31-character replay descriptions;
-- view volumes inheriting their parent's replay;
-- recycle-bin-first deletes;
-- no replays of never-written volumes.
+## Unit tests
 
-## Validation results (SC5020, SCOS 07.02.30, HPE CSI 3.3.0, Kubernetes 1.36)
+`nix flake check` builds the binary and runs `go test ./...` without build
+tags, plus `gofmt`, `go vet` and the deploy and Nix format checks
+(`nix/checks.nix`). It is the merge gate. Tests there use no network, no
+root and no array.
 
-| Test | Result |
-|---|---|
-| Unit tests | all pass under `-race`. Includes 20 parallel same-name creates → exactly 1 volume, and 20 concurrent publishes to 2 hosts |
-| CSI e2e | RWO xfs, RWX raw block shared by two pods, online expansion, VolumeSnapshot → restore with point-in-time data, PVC→PVC clone grown on creation, clean teardown |
-| Two nodes | RWX raw block shared across nodes; detaching one node leaves the other's I/O running |
-| KubeVirt | VM booted from a CDI-imported RWX block DataVolume; repeated live migrations between nodes with different CPU generations, 1–2 s each, guest never rebooted |
-| Path loss | one path offline under direct I/O: 0 errors, 0 slow writes |
-| Restarts | CSP (both replicas), CSI controller, CSI node plugin restarted under I/O: 0 errors |
-| All-path loss | I/O held for ~120 s (`no_path_retry 24`), then failed fast; recovered right after the paths returned |
-| Leader failover | leader killed during provisioning of 6 PVCs: new leader, 6/6 pods running, exactly 6 volumes, clean teardown |
+## The `fakearray` tag
 
-Repeated on a 12-node cluster (HPE CSI 3.3.0, Kubernetes 1.35 RKE2, Kube-OVN, release 0.3.1), with ten nodes attached, four of them through adopted legacy server objects (VMware ESXi OS type): CSI e2e on two classes, an attach on every node, live migrations of a VM (about 2 s each; the guest re-read its disk after dropping its caches following each of six moves, with no mismatch and no I/O error), path loss, restarts and all-path loss with the same results, leader failover, and the deletion of a volume that carried a replay taken by the array's snapshot schedule. Ceph OSDs on static volumes of the same array and of a second array on the same hosts were not disturbed by the node plugin's start, restart, attach or detach.
+Tests that start the fake array (`internal/sc/scfake`) carry the build tag
+`fakearray`, so the default `go test ./...` skips them. The fake serves the
+Storage Center REST calls the driver uses and copies the array's quirks;
+the list is in the package comment of `internal/sc/scfake/fake.go`.
 
-Not yet validated: SC controller failover, real switch-port failures, multi-day soak, other SC models.
+New Storage Center behaviour goes into the fake, with a tagged test that
+shows it.
+
+## csi-sanity
+
+`test/sanity` runs the kubernetes-csi sanity suite (`csi-test`) against
+the controller and node services, served in-process on unix sockets. The
+controller talks to the fake array; the node uses the fake Connector and
+Mounter from `internal/driver/fake`, so no FC hardware or root is needed.
+Set `SANITY_LOG=1` to see the driver's log.
+
+## End to end on a cluster
+
+These tests run against real hardware and change state on the array and
+the nodes.
+
+- `hack/csi-e2e.sh basic|snapshot|all` applies the manifests in
+  `deploy/tests` and checks: a ReadWriteOnce filesystem volume, a raw block
+  volume shared by two pods, online expansion, snapshot and restore, and a
+  clone. Set `STORAGE_CLASS` and `SNAPSHOT_CLASS` to your class names. Each
+  test deletes its namespace and checks that no PV is left.
+- `hack/failover-test.sh path|restarts|allpaths|all` runs on the node that
+  hosts the I/O pod (`deploy/tests/io-load.yaml`). It takes one path or all
+  paths of the test volume offline, or restarts the driver pods, while the
+  pod writes. It only touches SCSI paths of the test volume.
+- `deploy/tests/rwx-two-node.yaml` shares a raw block volume between pods
+  on two nodes; `deploy/tests/kubevirt-vm.yaml` boots a live-migratable
+  KubeVirt VM from a raw block volume.

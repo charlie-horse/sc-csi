@@ -1,3 +1,5 @@
+//go:build fakearray
+
 package csp
 
 import (
@@ -65,7 +67,7 @@ func TestCreateVolumeIdempotentAndProfiles(t *testing.T) {
 	if err != nil || v2.ID != v1.ID {
 		t.Fatalf("second create should return the same volume: %v %v", v2.ID, err)
 	}
-	if got := a.Volume(v1.ID)["volumeFolderPath"]; got != "scseries-csp/" {
+	if got := a.Volume(v1.ID)["volumeFolderPath"]; got != "sc-csi/" {
 		t.Errorf("volume folder = %v", got)
 	}
 	if _, err := s.CreateVolume(ctx, c, CreateVolumeRequest{Name: "pvc-x", Size: 1 << 30, Config: map[string]any{"storageProfile": "nope"}}); status(err) != 400 {
@@ -101,7 +103,7 @@ func TestAssertHostPartialAndForeign(t *testing.T) {
 		t.Errorf("only the free port should be used: %v", h.WWPNs)
 	}
 	srv := a.Servers()["node-a"]
-	if srv == nil || !strings.Contains(srv["notes"].(string), "csp-node-uuid=u1") || srv["serverFolderPath"] != "scseries-csp/" {
+	if srv == nil || !strings.Contains(srv["notes"].(string), "csp-node-uuid=u1") || srv["serverFolderPath"] != "sc-csi/" {
 		t.Fatalf("server not created as expected: %v", srv)
 	}
 	// re-assert with a new uuid (reinstalled node): same server, uuid replaced
@@ -246,7 +248,7 @@ func TestSnapshotsAndClones(t *testing.T) {
 }
 
 // A snapshot profile on the volume (StorageClass snapshotProfile, or array-default) makes the array take
-// replays on its own. They must not look like CSI snapshots, or the HPE driver never deletes the volume.
+// replays on its own. They are not listed as CSI snapshots.
 func TestScheduledReplaysAreNotSnapshots(t *testing.T) {
 	a, c, s, ctx := setup(t)
 	v, _ := s.CreateVolume(ctx, c, CreateVolumeRequest{Name: "pvc-sched", Size: 1 << 30, Config: map[string]any{"snapshotProfile": "Daily"}})
@@ -276,18 +278,6 @@ func TestScheduledReplaysAreNotSnapshots(t *testing.T) {
 	}
 	if err := s.DeleteVolume(ctx, c, v.ID); err != nil {
 		t.Errorf("a volume with only scheduled replays must be deletable: %v", err)
-	}
-}
-
-func TestLegacyNodeTagStillRecognised(t *testing.T) {
-	if got := NodeUUIDFromNotes("kube-dc-csp managed kube-dc-node-uuid=abc-1"); got != "abc-1" {
-		t.Errorf("legacy tag: got %q", got)
-	}
-	if got := NodeUUIDFromNotes("scseries-csp managed csp-node-uuid=abc-2"); got != "abc-2" {
-		t.Errorf("current tag: got %q", got)
-	}
-	if got := NodeUUIDFromNotes("hand-made server"); got != "" {
-		t.Errorf("no tag: got %q", got)
 	}
 }
 

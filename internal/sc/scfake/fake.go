@@ -1,5 +1,5 @@
 // Package scfake is an in-memory Storage Center REST API for unit tests. It implements the calls the CSP
-// uses and reproduces behaviours observed on a real SC5020 (SCOS 7.2.30): API-version negotiation on login,
+// uses and reproduces these SCOS 7.x behaviours: API-version negotiation on login,
 // one-element lists from CreateReplay/CreateView, 31-character replay descriptions, view volumes inheriting
 // their parent's replay, DELETE moving a volume to the recycle bin first, and no replays of never-written
 // volumes.
@@ -31,6 +31,8 @@ type Array struct {
 	Server   *httptest.Server
 	User     string
 	Password string
+	// AutoActive marks new volumes as written, so they can be snapshotted at once.
+	AutoActive bool
 
 	mu       sync.Mutex
 	next     int
@@ -201,7 +203,7 @@ func (a *Array) newVolume(name, folder string, size int64, parentReplay string) 
 	a.volumes[id] = obj{"instanceId": id, "name": name, "instanceName": name, "configuredSize": fmt.Sprintf("%d Bytes", size),
 		// NAA layout seen on SC arrays: 6000d31 + 7-hex serial + 16-hex volume index
 		"deviceId": fmt.Sprintf("6000d31%07x%016x", ssnNum, idx), "serialNumber": fmt.Sprintf("%08x-%08x", ssnNum, idx), "volumeFolderPath": path,
-		"mapped": false, "active": false, "inRecycleBin": false, "scSerialNumber": ssnNum, "parentReplay": parentReplay}
+		"mapped": false, "active": a.AutoActive, "inRecycleBin": false, "scSerialNumber": ssnNum, "parentReplay": parentReplay}
 	a.vconf[id] = obj{"storageProfile": ref("x", "Recommended (All Tiers)"), "dataReductionProfile": ref("y", "Deduplication with Compression"),
 		"replayProfileList": []any{"Daily"}}
 	return id

@@ -1,3 +1,5 @@
+//go:build fakearray
+
 package sc_test
 
 import (

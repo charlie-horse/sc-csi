@@ -1,0 +1,18 @@
+# Example StorageClass. A parameter that is left out uses the controller's
+# SC_* setting. Profile values are profile names on the array. An empty
+# snapshotProfile sets no snapshot schedule; "array-default" keeps the
+# array's own schedule.
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: sc-block
+provisioner: sc.csi.neuros.is
+reclaimPolicy: Delete
+volumeBindingMode: WaitForFirstConsumer
+allowVolumeExpansion: true
+parameters:
+  csi.storage.k8s.io/fstype: ext4
+  storageProfile: Recommended (All Tiers)
+  dataReductionProfile: Compression
+  snapshotProfile: ""
+  description: Kubernetes volume

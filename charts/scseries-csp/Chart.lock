@@ -1,6 +1,0 @@
-dependencies:
-- name: hpe-csi-driver
-  repository: https://hpe-storage.github.io/co-deployments
-  version: 3.3.0
-digest: sha256:29250f694862f31de1b69c4166808acee9ee56eb9cd9567865236d84d398bed5
-generated: "2026-11-20T06:48:28.623066908Z"

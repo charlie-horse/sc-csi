@@ -1,0 +1,15 @@
+# The image tag must equal nix/version.nix (the `deploy-version` flake check).
+# secret.example.yaml is not listed: create the sc-csi-array Secret yourself.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - namespace.yaml
+  - csidriver.yaml
+  - rbac.yaml
+  - controller.yaml
+  - node.yaml
+  - storageclass.yaml
+  - volumesnapshotclass.yaml
+images:
+  - name: cr.neuros.is/sc-csi
+    newTag: "0.4.0"

@@ -220,7 +220,7 @@ def _folder(sc, obj, folder):
     found = [f for f in sc.getlist(obj, scSerialNumber=sc.ssn) if f.get("name") == folder]
     if found:
         return found[0]["instanceId"]
-    f = sc.call("POST", f"StorageCenter/{obj}", {"Name": folder, "StorageCenter": sc.ssn, "Notes": "scseries-csp managed"})
+    f = sc.call("POST", f"StorageCenter/{obj}", {"Name": folder, "StorageCenter": sc.ssn, "Notes": "sc-csi managed"})
     print(f"  created {obj} {folder}")
     return f["instanceId"]
 
@@ -297,7 +297,7 @@ def cmd_csp_user(sc, a):
     def save():
         fd = os.open(out, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
         with os.fdopen(fd, "w") as f:
-            f.write(f"# scseries-csp service account on SC {sc.ssn} (VolumeManager, folders {a.folder})\n"
+            f.write(f"# sc-csi service account on SC {sc.ssn} (VolumeManager, folders {a.folder})\n"
                     f"CSP_SC_USER={a.user}\nCSP_SC_PASSWORD={password}\n")
         print(f"  credentials written to {os.path.normpath(out)} (mode 600)")
 
@@ -316,8 +316,8 @@ def cmd_csp_user(sc, a):
             save()
         return
     u = sc.call("POST", "StorageCenter/ScUser", {
-        "Name": a.user, "RealName": "scseries-csp", "Password": password, "Privilege": a.privilege or "Admin",
-        "SessionTimeout": "Hours12", "StorageCenter": sc.ssn, "Notes": "scseries-csp service account",
+        "Name": a.user, "RealName": "sc-csi", "Password": password, "Privilege": a.privilege or "Admin",
+        "SessionTimeout": "Hours12", "StorageCenter": sc.ssn, "Notes": "sc-csi service account",
         "UserGroupList": [gid]})
     print(f"  created user {a.user} ({u['instanceId']}, privilege {u.get('privilege')})")
     _link_group(sc, gid, vf, sf, df, u["instanceId"])
@@ -347,8 +347,8 @@ def main():
     s.add_argument("--yes", action="store_true")
     s.add_argument("--force", action="store_true", help="also try servers that still have mappings (e.g. vVol bindings)")
     u = sub.add_parser("csp-user")
-    u.add_argument("--user", default="scseries-csp")
-    u.add_argument("--folder", default="scseries-csp")
+    u.add_argument("--user", default="sc-csi")
+    u.add_argument("--folder", default="sc-csi")
     u.add_argument("--reset-password", action="store_true", help="set a new password and rewrite .env/csp.env")
     u.add_argument("--privilege", choices=["VolumeManager", "Reporter", "Admin"], help="privilege for a new user (default Admin), or upgrade an existing one")
     r = sub.add_parser("remove-hbas")
@@ -356,7 +356,7 @@ def main():
     r.add_argument("--yes", action="store_true")
     o = sub.add_parser("adopt-servers")
     o.add_argument("--match", required=True, help="regex on server name")
-    o.add_argument("--folder", default="scseries-csp", help="CSP server folder")
+    o.add_argument("--folder", default="sc-csi", help="CSP server folder")
     o.add_argument("--yes", action="store_true")
     a = p.parse_args()
     sc = _probe.SC()

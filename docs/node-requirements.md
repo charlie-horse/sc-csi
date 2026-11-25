@@ -1,71 +1,82 @@
 # Node requirements
 
-Every node that may attach SC volumes needs the following.
+What each node that attaches SC volumes needs. The nodes run NixOS. The
+driver installs no packages and writes no multipath configuration; the
+host's NixOS configuration provides both.
 
-## Packages and HPE node plugin
+## What the node plugin uses on the host
 
-- `multipath-tools` (multipathd running) and `sg3-utils`.
-- The chart configures the HPE node plugin with `disableNodeConformance`, `disableNodeConfiguration` and `disableNodeMonitor`. It therefore installs no packages, does not rewrite `/etc/multipath.conf`, and never removes multipath devices it does not own. The settings below are the node's responsibility.
+Read the exact mounts and settings from `deploy/kubernetes/node.yaml`. In
+short, the node container:
 
-## Multipath
+- runs privileged, with the host's `/dev`, `/sys`, `/run/udev` and the
+  kubelet directory mounted in;
+- mounts the host root at a fixed path (`HOST_ROOT`) and runs `multipath`,
+  `multipathd` and `dmsetup` there through `chroot`, so it uses the host's
+  own binaries and `/etc/multipath*` files;
+- searches the host's system profile (`HOST_PATH`) for those tools;
+- uses host networking and host IPC, so it reaches the `multipathd`
+  socket and syncs with device-mapper and udev on the host;
+- carries its own filesystem tools (`nix/image.nix`) for `mkfs`, `mount`,
+  `fsck` and resizing.
 
-1. **Finite queueing and WWID exceptions.** The built-in `COMPELNT` entry queues I/O forever on total path loss, which hangs pods, VMs and CSI unstage. Generate a drop-in per array serial:
-   ```bash
-   hack/multipath-config.sh <ssn> [<ssn>...] | sudo tee /etc/multipath/conf.d/sc-series.conf
-   sudo multipathd reconfigure
-   ```
-   - `no_path_retry 24`: about 2 minutes of queueing, then I/O errors.
-   - A `blacklist_exceptions` WWID entry for the array's volumes (`^36000d31<serial hex>00`), which excludes vVol protocol endpoints.
-2. **Images that claim nothing by default** (`find_multipaths "strict"` plus `blacklist { wwid ".*" }`, a safe choice when hosts see other arrays' LUNs) also need [deploy/node/multipath-fc-worker.conf](../deploy/node/multipath-fc-worker.conf) (`find_multipaths greedy`). Otherwise CSI-attached volumes never get a dm device. With `on` instead of `greedy`, a volume seen on a single path also gets none.
-3. **Verify:**
+On attach, the driver adds the volume's WWID to the host's
+`/etc/multipath/wwids` (`multipath -a`) and asks `multipathd` to add the
+paths. On detach it flushes the map and deletes the SCSI devices.
+
+## Rules for the host
+
+1. **FC ports.** The node has at least one FC port in
+   `/sys/class/fc_host`, zoned to the array
+   ([array-setup.md](array-setup.md#fibre-channel-zoning)). A node without
+   FC ports cannot register the driver: run the node DaemonSet only on FC
+   nodes (add a `nodeSelector` in your kustomize overlay), and keep pods
+   that use these volumes on the same nodes.
+2. **Multipath is on.** The host's NixOS configuration enables
+   `services.multipath`, so `multipathd` runs and `multipath`,
+   `multipathd` and `dmsetup` are in the system profile.
+3. **Finite queueing.** Multipath's built-in entry for `COMPELNT` queues
+   I/O forever when every path is lost. That hangs pods and blocks unstage.
+   Set `no_path_retry` for vendor `COMPELNT`, product `Compellent Vol`, to
+   a finite count (for example 24: with a 5 s polling interval, about two
+   minutes of queueing, then I/O errors).
+4. **Claim SC volumes, and only those.** If the blacklist excludes every
+   WWID (`blacklist { wwid ".*" }`, a safe choice when the node also sees
+   other arrays), add a `blacklist_exceptions` WWID entry per array:
+   `^36000d31<array serial as 7 hex digits>00`. This also keeps the array's
+   vVol protocol endpoints out, as their WWIDs continue with `01`.
+   `hack/multipath-config.sh <serial>...` prints the matching settings as a
+   `multipath.conf` drop-in; carry them over into the NixOS
+   configuration.
+5. **Verify** on the node:
    ```bash
    multipath -v3 -d 2>&1 | grep -E 'whitelisted|blacklisted'
    ```
-   SC volume paths should be whitelisted, and everything else (other arrays, local disks) blacklisted.
+   SC volume paths are whitelisted; other arrays' LUNs and local disks are
+   blacklisted.
 
-## Container runtime (KubeVirt / CDI)
+## Raw block volumes for non-root pods
 
-KubeVirt virt-launcher and the CDI importer run as non-root. For raw block PVCs, containerd must hand device ownership to the pod:
+The driver publishes a raw block volume as a device node owned by root.
+Pods that run as another user (for example KubeVirt's virt-launcher or
+the CDI importer) can only open it when the container runtime hands device
+ownership to the pod. For containerd:
 
 ```toml
-# containerd 2.x (RKE2: /var/lib/rancher/rke2/agent/etc/containerd/config-v3.toml.tmpl)
 [plugins."io.containerd.cri.v1.runtime"]
   device_ownership_from_security_context = true
 ```
 
-Without it, importer and VM pods fail with "Permission denied" on `/dev/...` (the CDI importer: `qemu-img: ... Could not open '/dev/cdi-block-volume': Permission denied`).
-
-- The HPE node plugin publishes a raw block volume as its own device node, owned by `root:root` with mode `0640`. Adding the `disk` group to the pod (what some platforms do for Ceph RBD devices, which are `root:disk 0660`) therefore does not help; the runtime has to hand the device to the pod's user.
-- RKE2 1.32 and later read drop-ins, so the template need not be copied:
-  ```toml
-  # /var/lib/rancher/rke2/agent/etc/containerd/config-v3.toml.d/10-device-ownership.toml
-  [plugins."io.containerd.cri.v1.runtime"]
-    device_ownership_from_security_context = true
-  ```
-  Restart `rke2-agent` (workers) or `rke2-server` (servers) one node at a time; running containers keep running. Verify with `containerd config dump | grep device_ownership`: the rendered `config.toml` itself still shows `false`, the drop-in overrides it.
-- It applies to containers created after the restart, on every node a VM may run on or migrate to.
-
-## Kernel limits
-
-```
-fs.inotify.max_user_instances = 8192
-```
-
-At the default 128, KubeVirt's virt-handler device plugins fail ("too many open files") and the node is marked `kubevirt.io/schedulable=false`.
-
-## Topology label
-
-The HPE node plugin reports topology only from the label `csi.hpe.com/zone`. Without it, provisioning fails with "no topology key found for node".
-
-```bash
-kubectl label node <node> csi.hpe.com/zone=<value>
-kubectl -n <ns> delete pod -l app=hpe-csi-node --field-selector spec.nodeName=<node>
-```
-
-Label only nodes with working FC access. Use the same value in the StorageClass `allowedTopologies`.
+Without it, such pods fail with "Permission denied" on `/dev/...`. It
+applies to containers created after containerd restarts, on every node the
+pod may run on.
 
 ## KubeVirt live migration
 
-- VMs with `host-model` CPUs cannot migrate between CPU generations. Set a common model, either in the KubeVirt CR (`spec.configuration.cpuModel`) or per VM (`spec.domain.cpu.model`). The node label `cpu-model.node.kubevirt.io/<model>` shows what each node offers.
-- VM disks must be RWX raw block. The chart's CDI integration makes that the default for DataVolumes on its StorageClasses.
-- Set `evictionStrategy: LiveMigrate` on VMs.
+- VM disks must be raw block volumes with ReadWriteMany access.
+- VMs with `host-model` CPUs cannot move between CPU generations. Set a
+  common CPU model in the KubeVirt CR (`spec.configuration.cpuModel`) or
+  per VM.
+- KubeVirt's device plugins need `fs.inotify.max_user_instances` well
+  above the kernel default (for example 8192); otherwise the node is marked
+  `kubevirt.io/schedulable=false`.

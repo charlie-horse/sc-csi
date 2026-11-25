@@ -11,22 +11,25 @@ import (
 	"strings"
 	"time"
 
-	"github.com/kube-dc/scseries-csp/internal/sc"
+	"github.com/charlie-horse/sc-csi/internal/sc"
 )
 
 const (
 	gib          = int64(1) << 30
-	noteManaged  = "scseries-csp managed"
-	noteUUID     = "csp-node-uuid="     // written into the Notes of server objects the CSP owns
-	legacyUUID   = "kube-dc-node-uuid=" // tag written by earlier releases; still recognised
-	helperPrefix = "snap-for-clone-"    // HPE driver's temporary snapshot for PVC->PVC clones
-	descMax      = 31                   // SC truncates replay descriptions to 31 characters
+	noteManaged  = "sc-csi managed"
+	noteUUID     = "csp-node-uuid="  // written into the Notes of server objects the CSP owns
+	helperPrefix = "snap-for-clone-" // temporary snapshot for PVC->PVC clones
+	descMax      = 31                // SC truncates replay descriptions to 31 characters
 
 	// ArrayDefault as snapshot profile keeps the array's default snapshot schedule on new volumes.
 	ArrayDefault = "array-default"
+
+	// CloneHelperPrefix starts the name of a temporary snapshot taken to clone a volume; the clone
+	// expires it and listings hide it.
+	CloneHelperPrefix = helperPrefix
 )
 
-var uuidTag = regexp.MustCompile(`(?:` + regexp.QuoteMeta(noteUUID) + `|` + regexp.QuoteMeta(legacyUUID) + `)(\S+)`)
+var uuidTag = regexp.MustCompile(regexp.QuoteMeta(noteUUID) + `(\S+)`)
 
 // NodeUUIDFromNotes returns the node UUID recorded in a server object's Notes ("" if none).
 func NodeUUIDFromNotes(notes string) string {
@@ -46,11 +49,11 @@ type Config struct {
 	SnapshotProfile string // "" = no snapshot schedule (CSI manages snapshots); ArrayDefault keeps the array's
 }
 
-// Defaults returns neutral conventions; deployments override them (see the Helm chart values).
+// Defaults returns neutral conventions; deployments override them through the SC_* environment.
 func Defaults() Config {
 	return Config{
-		VolumeFolder: "scseries-csp",
-		ServerFolder: "scseries-csp",
+		VolumeFolder: "sc-csi",
+		ServerFolder: "sc-csi",
 		ServerOS:     "Red Hat Linux 7.x",
 	}
 }
@@ -344,9 +347,7 @@ func toSnapshot(r *sc.Replay, v *sc.Volume, name string) Snapshot {
 
 // userReplays lists frozen replays created on this volume with a description. It skips the active replay,
 // replays a view volume inherits from its parent, replays taken by the array's snapshot schedule and,
-// unless helpers is set, the driver's clone helpers. Scheduled replays are not CSI snapshots: the HPE
-// driver refuses to delete a volume while GET /snapshots?volume_id= lists anything for it, so reporting
-// them would make every volume with a snapshot profile undeletable after the first scheduled replay.
+// unless helpers is set, the driver's clone helpers. Scheduled replays are not reported as CSI snapshots.
 func (s *Service) userReplays(ctx context.Context, c *sc.Client, v *sc.Volume, helpers bool) ([]sc.Replay, error) {
 	var all []sc.Replay
 	if err := c.Get(ctx, "StorageCenter/ScVolume/"+v.InstanceID+"/ReplayList", &all); err != nil {
@@ -760,4 +761,60 @@ func (s *Service) Unpublish(ctx context.Context, c *sc.Client, volID string, req
 		}
 	}
 	return nil
+}
+
+// UnpublishAll removes every mapping profile of a volume to a server in the CSP's server folder.
+// A volume that is gone counts as unpublished.
+func (s *Service) UnpublishAll(ctx context.Context, c *sc.Client, volID string) error {
+	if _, err := s.getVolume(ctx, c, volID); err != nil {
+		var e *Error
+		if errors.As(err, &e) && e.Status == http.StatusNotFound {
+			return nil
+		}
+		return err
+	}
+	c.Mutate.Lock()
+	defer c.Mutate.Unlock()
+	var profiles []sc.MappingProfile
+	if err := c.Get(ctx, "StorageCenter/ScVolume/"+volID+"/MappingProfileList", &profiles); err != nil {
+		return err
+	}
+	for _, mp := range profiles {
+		var srv sc.Server
+		if err := c.Get(ctx, "StorageCenter/ScServer/"+mp.Server.ID(), &srv); err != nil {
+			return err
+		}
+		if !inFolder(srv.ServerFolderPath, s.Cfg.ServerFolder) {
+			continue
+		}
+		if err := c.Delete(ctx, "StorageCenter/ScMappingProfile/"+mp.InstanceID); err != nil {
+			return err
+		}
+		s.Log.Info("unmapped volume", "id", volID, "server", srv.Name)
+	}
+	return nil
+}
+
+// MappedServers returns the SC server ids a volume is mapped to (empty for an unknown volume).
+func (s *Service) MappedServers(ctx context.Context, c *sc.Client, volID string) ([]string, error) {
+	var profiles []sc.MappingProfile
+	if err := c.Get(ctx, "StorageCenter/ScVolume/"+volID+"/MappingProfileList", &profiles); err != nil {
+		return nil, err
+	}
+	out := []string{}
+	for _, mp := range profiles {
+		if id := mp.Server.ID(); id != "" {
+			out = append(out, id)
+		}
+	}
+	return out, nil
+}
+
+// VolumeWritten reports whether Storage Center has data for the volume; it only snapshots written volumes.
+func (s *Service) VolumeWritten(ctx context.Context, c *sc.Client, volID string) (bool, error) {
+	v, err := s.getVolume(ctx, c, volID)
+	if err != nil {
+		return false, err
+	}
+	return v.Active, nil
 }

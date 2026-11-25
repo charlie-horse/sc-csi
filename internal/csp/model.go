@@ -1,4 +1,4 @@
-// Package csp implements the HPE CSI Driver Container Storage Provider operations on Dell SC Series.
+// Package csp implements volume, snapshot, host and mapping operations on Dell SC Series.
 package csp
 
 import (
@@ -6,7 +6,7 @@ import (
 	"net/http"
 )
 
-// Volume is the CSP volume object (HPE CSP OpenAPI "Volume").
+// Volume is a volume the driver owns.
 type Volume struct {
 	ID             string         `json:"id"`
 	Name           string         `json:"name"`
@@ -83,7 +83,7 @@ type SnapshotRequest struct {
 	Config      map[string]any `json:"config"`
 }
 
-// Error is returned to the HPE driver as {"errors":[{"code","message"}]} with Status.
+// Error is an operation error with an HTTP-style Status (404, 409, ...).
 type Error struct {
 	Status int
 	Msg    string

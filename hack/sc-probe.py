@@ -102,7 +102,7 @@ class SC:
         return self.post(f"StorageCenter/{obj}/GetList", {"filter": {"filterType": "AND", "filters": f}}) or []
 
     def login(self):
-        payload = {"Application": "scseries-csp sc-probe", "ApplicationVersion": "0.1"}
+        payload = {"Application": "sc-csi sc-probe", "ApplicationVersion": "0.1"}
         try:
             r = self.post("ApiConnection/Login", payload)
         except RuntimeError as e:
@@ -245,7 +245,7 @@ def cmd_lifecycle(sc, a):
             servers.append(srv)
     vname = f"{PREFIX}{time.strftime('%Y%m%d-%H%M%S')}"
     payload = {"Name": vname, "Size": f"{a.size_gb} GB", "StorageCenter": sc.ssn,
-               "Notes": "scseries-csp sc-probe disposable test volume"}
+               "Notes": "sc-csi sc-probe disposable test volume"}
     if a.folder:
         folders = [f for f in sc.getlist("ScVolumeFolder", scSerialNumber=sc.ssn) if f.get("name") == a.folder]
         if not folders:

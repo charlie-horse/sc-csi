@@ -181,7 +181,7 @@ func (c *Client) Host() string { return c.cfg.Host }
 func (c *Client) login(ctx context.Context) error {
 	c.loginMu.Lock()
 	defer c.loginMu.Unlock()
-	payload := map[string]any{"Application": "scseries-csp", "ApplicationVersion": "1.0"}
+	payload := map[string]any{"Application": "sc-csi", "ApplicationVersion": "1.0"}
 	status, body, err := c.raw(ctx, http.MethodPost, "ApiConnection/Login", payload)
 	if err == nil && status != http.StatusOK {
 		if m := versionRange.FindStringSubmatch(string(body)); m != nil {

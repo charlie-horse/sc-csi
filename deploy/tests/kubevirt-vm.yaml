@@ -56,5 +56,5 @@ spec:
           cloudInitNoCloud:
             userData: |
               #!/bin/sh
-              echo "scseries-csp test vm booted: $(date)" > /dev/console
+              echo "sc-csi test vm booted: $(date)" > /dev/console
               while true; do echo "heartbeat $(date +%T) $(cat /proc/uptime)" > /dev/console; sleep 10; done &

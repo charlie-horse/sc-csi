@@ -6,7 +6,9 @@ private/
 values-site*.yaml
 # build output
 dist/
-charts/*/charts/*.tgz
+# nix build output links
+result
+result-*
 # tooling
 __pycache__/
 .claude/

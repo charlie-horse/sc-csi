@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# End-to-end CSI tests (HPE CSI Driver + scseries-csp).
+# End-to-end CSI tests against a running sc-csi driver.
 #   STORAGE_CLASS (default scseries-fc), SNAPSHOT_CLASS (default scseries-snap)
 #   ARRAY_CHECK=1 additionally checks the array via hack/sc-maint.py (needs .env with SC_* credentials)
 #   hack/csi-e2e.sh basic      RWO filesystem, RWX raw block shared by two pods, online expansion

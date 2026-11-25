@@ -27,10 +27,10 @@ import (
 	"k8s.io/client-go/tools/leaderelection"
 	"k8s.io/client-go/tools/leaderelection/resourcelock"
 
-	"github.com/kube-dc/scseries-csp/internal/csp"
-	"github.com/kube-dc/scseries-csp/internal/monitor"
-	"github.com/kube-dc/scseries-csp/internal/sc"
-	"github.com/kube-dc/scseries-csp/internal/server"
+	"github.com/charlie-horse/sc-csi/internal/csp"
+	"github.com/charlie-horse/sc-csi/internal/monitor"
+	"github.com/charlie-horse/sc-csi/internal/sc"
+	"github.com/charlie-horse/sc-csi/internal/server"
 )
 
 var version = "dev"

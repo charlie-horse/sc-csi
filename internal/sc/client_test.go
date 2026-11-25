@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/kube-dc/scseries-csp/internal/sc"
-	"github.com/kube-dc/scseries-csp/internal/sc/scfake"
+	"github.com/charlie-horse/sc-csi/internal/sc"
+	"github.com/charlie-horse/sc-csi/internal/sc/scfake"
 )
 
 func TestTLSFingerprintPinning(t *testing.T) {

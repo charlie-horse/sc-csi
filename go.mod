@@ -1,4 +1,4 @@
-module github.com/kube-dc/scseries-csp
+module github.com/charlie-horse/sc-csi
 
 go 1.26.0
 

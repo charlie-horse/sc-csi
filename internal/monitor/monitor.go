@@ -11,7 +11,7 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/kube-dc/scseries-csp/internal/sc"
+	"github.com/charlie-horse/sc-csi/internal/sc"
 )
 
 // Metrics are the array health collectors.

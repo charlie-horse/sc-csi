@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/kube-dc/scseries-csp/internal/sc"
+	"github.com/charlie-horse/sc-csi/internal/sc"
 )
 
 const (

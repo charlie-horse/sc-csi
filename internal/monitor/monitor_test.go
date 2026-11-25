@@ -10,8 +10,8 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/testutil"
 
-	"github.com/kube-dc/scseries-csp/internal/sc"
-	"github.com/kube-dc/scseries-csp/internal/sc/scfake"
+	"github.com/charlie-horse/sc-csi/internal/sc"
+	"github.com/charlie-horse/sc-csi/internal/sc/scfake"
 )
 
 func TestPollExportsArrayHealth(t *testing.T) {

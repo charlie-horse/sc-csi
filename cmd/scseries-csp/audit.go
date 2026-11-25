@@ -19,8 +19,8 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 
-	"github.com/kube-dc/scseries-csp/internal/csp"
-	"github.com/kube-dc/scseries-csp/internal/sc"
+	"github.com/charlie-horse/sc-csi/internal/csp"
+	"github.com/charlie-horse/sc-csi/internal/sc"
 )
 
 func metaFor(name, ns string) metav1.ObjectMeta { return metav1.ObjectMeta{Name: name, Namespace: ns} }
